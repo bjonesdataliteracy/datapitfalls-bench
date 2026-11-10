@@ -30,13 +30,22 @@ python3 data/build_database.py --from-raw
 
 If the BTS form changes, the build fails with a specific message. Files downloaded by hand from TranStats (Aviation, Air Carrier Statistics, "Select all fields") can be dropped into `data/raw/` under the names the builder uses, for example `t100_segment_domestic_2026_07.csv`.
 
+## Scan it for traps
+
+```bash
+python3 data/scan_traps.py --from 2024-08 --to 2026-07
+```
+
+The scanner opens the database read-only and prints candidate traps with the rule ids that apply; see [`traps/README.md`](../traps/README.md) for how candidates become catalog entries.
+
 ## Test it
 
 ```bash
 python3 data/tests/test_builder.py
+python3 data/tests/test_scan_traps.py
 ```
 
-The tests use the tiny files in `data/tests/fixtures/`, whose rows are labeled `FIXTURE` and dated 2099. They never touch the network.
+The builder tests use the tiny files in `data/tests/fixtures/`, and the scanner tests build a small synthetic database; all rows are labeled `FIXTURE` and dated 2098 or 2099. Neither touches the network. `npm test` runs both along with the catalog checks.
 
 ## Credit
 

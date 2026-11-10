@@ -1,0 +1,25 @@
+{
+  "name": "@datapitfalls/bench",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A benchmark of analytics-agent memory on changing airline data.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bjonesdataliteracy/datapitfalls-bench.git"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs && python3 data/tests/test_builder.py && python3 data/tests/test_scan_traps.py",
+    "check:evidence": "node scripts/check-evidence.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@datapitfalls/schemas": "^0.1.0",
+    "ajv": "^8.20.0",
+    "datapitfalls": "^0.12.0",
+    "js-yaml": "^4.1.1"
+  }
+}

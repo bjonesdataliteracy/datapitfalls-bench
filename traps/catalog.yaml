@@ -1,0 +1,243 @@
+# datapitfalls bench: trap catalog (PRD 2, B2)
+#
+# Each entry is a Trap from @datapitfalls/schemas. These are data traps found
+# in the real, unmodified data by data/scan_traps.py and then checked by hand.
+# Definition and goal traps arrive with the business-context timeline (B4).
+#
+# Proposed replay window: 2024-08 to 2026-07. Scanned 2026-11-10 against data
+# fetched from BTS and OurAirports that day.
+#
+# start_month / end_month are data months: the first and last month of data in
+# which the trap is present. A trap with no end_month runs to the end of the
+# window. affected_questions is filled in when the question set exists (B3).
+#
+# Every evidence_query runs against the bench database:
+#   npm run check:evidence -- --db data/bench.db
+
+- id: late-filing-newest-months
+  kind: data
+  start_month: "2026-06"
+  pitfall_ids: [partial-period-aggregation, uneven-aggregation-coverage]
+  affected_questions: []
+  ground_truth: >-
+    The newest months are incomplete because some carriers, mostly foreign
+    ones, file late. In data fetched 2026-11-10, carriers that flew 1.3
+    million passengers in June 2025 and 1.7 million in July 2025 have no rows
+    yet for June and July 2026 (Emirates, Qatar, Singapore, Aeromexico, Air
+    Canada in June, and others). International passengers read as down about
+    9% year over year in those two months, against 1% to 5% down in the four
+    months before. Most of that extra drop is missing filings, not lost
+    traffic.
+  evidence_query: |
+    SELECT a.carrier_code, MAX(a.carrier_name) AS carrier, SUM(a.passengers) AS pax_july_2025
+    FROM segments a
+    WHERE a.year = 2025 AND a.month = 7
+      AND a.carrier_code NOT IN (SELECT carrier_code FROM segments WHERE year = 2026 AND month = 7)
+      AND a.carrier_code IN (SELECT carrier_code FROM segments WHERE year = 2026 AND month >= 4)
+    GROUP BY a.carrier_code
+    HAVING SUM(a.passengers) >= 20000
+    ORDER BY pax_july_2025 DESC;
+
+- id: hawaiian-stops-reporting
+  kind: data
+  start_month: "2026-01"
+  pitfall_ids: [measurement-system-drift, uneven-aggregation-coverage]
+  affected_questions: []
+  ground_truth: >-
+    Hawaiian Airlines (HA) reports through December 2025 and has no rows from
+    January 2026 on. It carried 11.6 million passengers in its final 12
+    months. In the same month Alaska Airlines (AS) steps up from about 3.2
+    million to 3.6 million passengers a month. Read by carrier code, this
+    looks like Hawaiian collapsing and Alaska surging; the traffic moved from
+    one reporting code to another.
+  evidence_query: |
+    SELECT year, month,
+           SUM(CASE WHEN carrier_code = 'HA' THEN passengers END) AS hawaiian_pax,
+           SUM(CASE WHEN carrier_code = 'AS' THEN passengers END) AS alaska_pax
+    FROM segments
+    WHERE (year = 2025 AND month >= 9) OR (year = 2026 AND month <= 4)
+    GROUP BY year, month
+    ORDER BY year, month;
+
+- id: silver-airways-stops-reporting
+  kind: data
+  start_month: "2025-07"
+  pitfall_ids: [measurement-system-drift, uneven-aggregation-coverage]
+  affected_questions: []
+  ground_truth: >-
+    Silver Airways (3M) reports through June 2025 and then stops, after
+    carrying about 700,000 passengers in its final 12 months. Counts of
+    carriers, and any ranking or average across carriers, change at that
+    month because the set of carriers changed, not because the others did.
+  evidence_query: |
+    SELECT year, month, SUM(passengers) AS pax, COUNT(*) AS segment_rows
+    FROM segments
+    WHERE carrier_code = '3M' AND year >= 2025
+    GROUP BY year, month
+    ORDER BY year, month;
+
+- id: airport-join-drops-palm-beach
+  kind: data
+  start_month: "2024-08"
+  pitfall_ids: [join-key-mismatch-row-loss]
+  affected_questions: []
+  ground_truth: >-
+    278 of the 2,232 origin codes in the window have no matching IATA code in
+    the OurAirports table. An inner join from segments to airports drops only
+    0.4% of passengers, so totals still look right, but nearly all of the
+    loss is one large airport: PBI (West Palm Beach) with 8.5 million
+    passengers. It vanishes from any airport, state or country breakdown
+    built on that join.
+  evidence_query: |
+    SELECT s.origin, MAX(s.origin_city_name) AS city, SUM(s.passengers) AS pax_dropped_by_inner_join
+    FROM segments s
+    WHERE s.year * 12 + s.month - 1 BETWEEN 2024 * 12 + 7 AND 2026 * 12 + 6
+      AND s.origin NOT IN (SELECT iata_code FROM airports WHERE iata_code IS NOT NULL)
+    GROUP BY s.origin
+    ORDER BY pax_dropped_by_inner_join DESC
+    LIMIT 10;
+
+- id: tiny-airports-top-growth-rankings
+  kind: data
+  start_month: "2024-08"
+  pitfall_ids: [small-sample-extremes, divide-by-tiny-denominator]
+  affected_questions: []
+  ground_truth: >-
+    Ranked by percent growth in scheduled passengers (August 2025 to July
+    2026 against the 12 months before), all of the top ten origin airports
+    had fewer than 100,000 passengers in the base year, and the leader grew
+    19,425% from a base of 4 passengers. Among airports with at least 100,000
+    base-year passengers the top growth is 65%. The unfiltered ranking
+    measures small denominators, not growth.
+  evidence_query: |
+    SELECT origin, pax_prior, pax_latest,
+           ROUND(100.0 * (pax_latest - pax_prior) / pax_prior, 1) AS growth_pct
+    FROM (
+      SELECT origin,
+             SUM(CASE WHEN year * 12 + month - 1 BETWEEN 2024 * 12 + 7 AND 2025 * 12 + 6 THEN passengers END) AS pax_prior,
+             SUM(CASE WHEN year * 12 + month - 1 BETWEEN 2025 * 12 + 7 AND 2026 * 12 + 6 THEN passengers END) AS pax_latest
+      FROM segments
+      WHERE service_class = 'F'
+      GROUP BY origin
+    )
+    WHERE pax_prior > 0 AND pax_latest IS NOT NULL
+    ORDER BY growth_pct DESC
+    LIMIT 10;
+
+- id: load-factor-average-of-rates
+  kind: data
+  start_month: "2024-08"
+  pitfall_ids: [unweighted-rate-average]
+  affected_questions: []
+  ground_truth: >-
+    Domestic scheduled load factor for August 2025 to July 2026 is 79.2% as
+    total passengers over total seats, but 71.0% as a plain average of
+    row-level load factors, because thousands of small rows count the same as
+    large ones. The gap differs by carrier (SkyWest: 76.1% against 54.9%), and
+    14 of the 17 largest carriers change rank between the two methods.
+  evidence_query: |
+    SELECT carrier_code, MAX(carrier_name) AS carrier,
+           ROUND(100.0 * SUM(passengers) / SUM(seats), 1) AS load_factor_weighted,
+           ROUND(100 * AVG(1.0 * passengers / seats), 1) AS load_factor_average_of_rows
+    FROM segments
+    WHERE year * 12 + month - 1 BETWEEN 2025 * 12 + 7 AND 2026 * 12 + 6
+      AND scope = 'domestic' AND service_class = 'F' AND seats > 0
+    GROUP BY carrier_code
+    HAVING SUM(passengers) >= 5000000
+    ORDER BY load_factor_weighted - load_factor_average_of_rows DESC;
+
+- id: regional-carriers-fly-for-majors
+  kind: data
+  start_month: "2024-08"
+  pitfall_ids: [data-reality-gap]
+  affected_questions: []
+  ground_truth: >-
+    T-100 records the carrier that operated the flight, not the brand that
+    sold the ticket. SkyWest, Republic and Envoy carry roughly a tenth of
+    domestic scheduled passengers under their own codes, flying for American,
+    Delta, United and Alaska. Market share by carrier code therefore
+    understates the major brands and shows regional operators as competitors
+    of the airlines they fly for. The data has no marketing-carrier column,
+    so the brand split cannot be recovered from these tables.
+  evidence_query: |
+    SELECT carrier_code, MAX(carrier_name) AS carrier,
+           ROUND(100.0 * SUM(passengers) / (
+             SELECT SUM(passengers) FROM segments
+             WHERE year = 2025 AND scope = 'domestic' AND service_class = 'F'), 1) AS share_pct
+    FROM segments
+    WHERE year = 2025 AND scope = 'domestic' AND service_class = 'F'
+    GROUP BY carrier_code
+    ORDER BY share_pct DESC
+    LIMIT 15;
+
+- id: passengers-are-boardings-not-travellers
+  kind: data
+  start_month: "2024-08"
+  pitfall_ids: [data-reality-gap]
+  affected_questions: []
+  ground_truth: >-
+    The passengers column counts boardings per flight. Someone flying SEA to
+    JFK through DEN on two flights is counted twice, in the segment table and
+    in the market table alike, so neither table gives travellers, trips or
+    origin-and-destination demand. The two tables differ by only 0.5% for
+    domestic scheduled service; they part only where one flight number makes
+    several stops. Summing passengers answers "how many boardings", and an
+    answer phrased as "people who flew" overstates.
+  evidence_query: |
+    SELECT
+      (SELECT SUM(passengers) FROM segments
+        WHERE year * 12 + month - 1 BETWEEN 2025 * 12 + 7 AND 2026 * 12 + 6
+          AND scope = 'domestic' AND service_class = 'F') AS segment_passengers,
+      (SELECT SUM(passengers) FROM markets
+        WHERE year * 12 + month - 1 BETWEEN 2025 * 12 + 7 AND 2026 * 12 + 6
+          AND scope = 'domestic' AND service_class = 'F') AS market_passengers;
+
+- id: city-means-one-airport-or-several
+  kind: data
+  start_month: "2024-08"
+  pitfall_ids: [uneven-aggregation-coverage, data-reality-gap]
+  affected_questions: []
+  ground_truth: >-
+    27 BTS city markets have two or more airports that each carry at least 1%
+    of the market. The busiest airport holds 34% of the New York market
+    (EWR), 37% of Washington (DCA), 53% of Miami and 65% of Los Angeles, but
+    96% of Phoenix. Comparing cities by their main airport code compares a
+    third of one city with nearly all of another.
+  evidence_query: |
+    SELECT origin_city_market_id, origin, MAX(origin_city_name) AS city, SUM(passengers) AS pax
+    FROM segments
+    WHERE year * 12 + month - 1 BETWEEN 2025 * 12 + 7 AND 2026 * 12 + 6
+      AND scope = 'domestic' AND passengers > 0
+      AND origin_city_market_id IN (
+        SELECT DISTINCT origin_city_market_id FROM segments WHERE origin IN ('EWR', 'DCA', 'MIA', 'LAX', 'PHX'))
+    GROUP BY origin_city_market_id, origin
+    HAVING SUM(passengers) >= 100000
+    ORDER BY origin_city_market_id, pax DESC;
+
+- id: envoy-load-factor-reversal
+  kind: data
+  start_month: "2025-08"
+  pitfall_ids: [simpsons-paradox]
+  affected_questions: []
+  ground_truth: >-
+    For August 2025 to July 2026, Alaska Airlines has the higher overall
+    domestic scheduled load factor (79.5% against Envoy Air's 78.5%), yet
+    Envoy is higher in every distance band both carriers fly: under 500
+    miles (76.3% against 69.4%), 500 to 999 (80.9% against 77.7%) and 1,000
+    to 1,999 (83.1% against 82.8%). Alaska flies mostly long routes, which
+    fill better for every carrier, so the overall figure reflects route mix.
+    Frontier and Envoy show the same reversal.
+  evidence_query: |
+    SELECT carrier_code,
+           CASE WHEN distance_miles < 500 THEN '1: under 500'
+                WHEN distance_miles < 1000 THEN '2: 500-999'
+                WHEN distance_miles < 2000 THEN '3: 1000-1999'
+                ELSE '4: 2000+' END AS distance_band,
+           SUM(seats) AS seats,
+           ROUND(100.0 * SUM(passengers) / SUM(seats), 1) AS load_factor
+    FROM segments
+    WHERE year * 12 + month - 1 BETWEEN 2025 * 12 + 7 AND 2026 * 12 + 6
+      AND scope = 'domestic' AND service_class = 'F' AND seats > 0
+      AND carrier_code IN ('AS', 'MQ')
+    GROUP BY carrier_code, distance_band
+    ORDER BY distance_band, carrier_code;

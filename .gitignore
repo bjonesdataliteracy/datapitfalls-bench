@@ -12,3 +12,6 @@ data/raw/
 data/*.db
 data/*.db-*
 __pycache__/
+
+# Scanner output
+scan*.json

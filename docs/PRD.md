@@ -34,31 +34,34 @@ Each simulated month, the agent sees only the data released by then, receives th
 ### The world
 
 - **Data:** BTS T-100 segment and market tables plus OurAirports, never edited.
-- **Replay:** 24 consecutive months. The "as-of" view hides months not yet published at that simulated date. BTS says T-100 data becomes public about 10 weeks after the month it covers, so the default as-of rule is a fixed release lag.
-- **Limit of the replay:** a database of final figures can hide a month, but it cannot show a month as it first appeared (partly reported, or before a carrier's correction). Traps that depend on as-released values need archived snapshots; until then they are marked "needs snapshots" in the catalog and left out of the gate.
-- **Snapshots:** archive each monthly BTS release from now on, so real revisions can be measured in v1.1.
+- **Replay:** 24 consecutive months, proposed as August 2024 to July 2026, with the database's earlier months (back to August 2019) kept as history for year-over-year questions. The "as-of" view hides months not yet published at that simulated date. BTS says T-100 data becomes public about 10 weeks after the month it covers, so the default as-of rule is a fixed release lag.
+- **Limit of the replay:** the database holds each month as BTS served it on the day it was fetched, not as it first appeared. Late filing is still visible in the newest months of any fetch (see the catalog), so that trap bites at the end of the window without snapshots; to make it bite in every simulated month, the as-of view would need archived snapshots. Corrections to earlier months look rare: monthly passenger totals for February 2025 to July 2026 were identical in a copy built on 2026-10-15 and a fetch on 2026-11-10.
+- **Snapshots:** the builder never re-downloads a cached file and records each file's hash and fetch time, so keeping `data/raw/` from each monthly build is the snapshot archive (B12).
 
 ### Trap catalog
 
-Traps come from three sources; each is labeled with its start month, affected questions and rule IDs.
+Traps come from three sources; each is labeled with its start month, affected questions and rule IDs. The data traps below were found in the real data by the scanner and are in [`traps/catalog.yaml`](../traps/catalog.yaml), each with the SQL that shows it. Definition and goal traps are still proposals; they arrive with the business-context timeline (B4).
 
-| Source | Example trap | Likely rule IDs |
-| --- | --- | --- |
-| Data | Latest month only partly reported, read as a drop (needs snapshots unless the database holds a partial month) | `partial-period-aggregation` |
-| Data | Carrier stops reporting after a merger; volume moves to another code | `measurement-system-drift`, `uneven-aggregation-coverage` |
-| Data | Operating vs marketing carrier: regionals flying for a major | `data-reality-gap` |
-| Data | Segment table counts connecting passengers once per leg; joining segment to market rows multiplies them | `data-reality-gap`, `join-fan-out` |
-| Data | Average of route load factors instead of a weighted total | `unweighted-rate-average` |
-| Data | Join to OurAirports drops rows on code mismatches | `join-key-mismatch-row-loss` |
-| Data | Tiny airports top a percent-growth ranking | `small-sample-extremes`, `divide-by-tiny-denominator` |
-| Data | A carrier's overall trend reverses once split by airport or route mix (candidate; confirm in the data) | `simpsons-paradox` |
-| Definition | "Capacity" switches from seats to seat-miles | `measurement-system-drift`, `mismatched-units` |
-| Definition | "Seattle" grows from SEA to SEA plus Paine Field | `measurement-system-drift` |
-| Goal | Persona moves from network planner to investor; new cuts multiply | `multiple-comparisons`, `cherry-picked-chart-window` |
+| Source | Trap | Rule IDs | Status |
+| --- | --- | --- | --- |
+| Data | Newest months are missing late-filing carriers and read as a drop | `partial-period-aggregation`, `uneven-aggregation-coverage` | In catalog |
+| Data | Carrier stops reporting (Hawaiian after Dec 2025, Silver after Jun 2025); after a merger the volume continues under another code | `measurement-system-drift`, `uneven-aggregation-coverage` | In catalog |
+| Data | Operating vs marketing carrier: regionals flying for a major | `data-reality-gap` | In catalog |
+| Data | "Passengers" are boardings per flight, not travellers or trips; segment and market tables nearly agree | `data-reality-gap` | In catalog, reworded |
+| Data | Average of row-level load factors instead of a weighted total | `unweighted-rate-average` | In catalog |
+| Data | Join to OurAirports drops rows on code mismatches, nearly all of it one large airport | `join-key-mismatch-row-loss` | In catalog |
+| Data | Tiny airports top a percent-growth ranking | `small-sample-extremes`, `divide-by-tiny-denominator` | In catalog |
+| Data | One carrier leads on overall load factor but trails in every distance band | `simpsons-paradox` | In catalog |
+| Data | A city is one airport or a multi-airport market | `uneven-aggregation-coverage`, `data-reality-gap` | In catalog |
+| Definition | "Capacity" switches from seats to seat-miles | `measurement-system-drift`, `mismatched-units` | Proposed |
+| Definition | A city's definition changes mid-series, for example from its main airport to the BTS city market (New York, Washington, Los Angeles) | `measurement-system-drift` | Proposed |
+| Goal | Persona moves from network planner to investor; new cuts multiply | `multiple-comparisons`, `cherry-picked-chart-window` | Proposed |
 
-Data traps are found by automated scans (reporting starts and stops, jumps beyond a threshold, join loss, revisions), then reviewed by hand. A trap enters the catalog only when the scanner or a hand check finds it in the actual database; the rows above are candidates until then.
+Data traps are found by `data/scan_traps.py` (late filing, carriers that stop or start, join loss, tiny-base growth, rate averaging, segment against market, multi-airport cities, service-class mix, Simpson's reversals), then reviewed by hand. A trap enters the catalog only when it is found in the actual database.
 
-The rule IDs above were checked against datapitfalls v0.12.0 (taxonomy version `8ecba93063d4`) and all exist; `join-fan-out`, `divide-by-tiny-denominator` and `simpsons-paradox` are extension rules. The harness validates every `pitfall_ids` entry against the installed taxonomy, resolving aliases, and fails on an unknown ID.
+Two earlier candidates changed on contact with the data. Segment and market passenger totals differ by only 0.5%, so "the segment table double-counts connections" was wrong as a contrast between the tables; the real trap is that both count boardings. And BTS's own Seattle city market holds SEA, Boeing Field and two seaplane bases, not Paine Field, so the city-definition trap now uses markets where the grouping matters.
+
+The rule IDs above were checked against datapitfalls v0.12.0 (taxonomy version `8ecba93063d4`) and all exist; `divide-by-tiny-denominator` and `simpsons-paradox` are extension rules. `npm test` validates every catalog entry against the Trap schema and every `pitfall_ids` entry against the installed taxonomy, and fails on an unknown ID or an alias.
 
 ### Questions
 
@@ -110,7 +113,7 @@ The harness is a TypeScript CLI over SQLite with pluggable agents and memory set
 | ID | Requirement | Priority |
 | --- | --- | --- |
 | B1 | As-of replay engine: given a simulated date, expose only the months published by then | P0 |
-| B2 | Trap catalog as YAML (Trap schema) plus the scanner that proposes data traps for review | P0 |
+| B2 | Trap catalog as YAML (Trap schema) plus the scanner that proposes data traps for review. First version shipped: scanner, ten data traps, catalog tests | P0 |
 | B3 | Question templates with gold-answer SQL and tolerances, generated per month | P0 |
 | B4 | Business-context timeline: per-month markdown for definitions and persona | P0 |
 | B5 | Agent adapter interface; a Claude adapter with a read-only SQL tool | P0 |
@@ -144,16 +147,16 @@ datapitfalls-bench/
 
 | Weeks | Milestone |
 | --- | --- |
-| 1 to 2 | Prior-art review (done, see [prior-art.md](prior-art.md)); spec frozen; trap scanner run; catalog reviewed |
+| 1 to 2 | Prior-art review (done, see [prior-art.md](prior-art.md)); database builder and trap scanner (done); catalog reviewed; spec frozen |
 | 3 to 4 | Harness, Claude adapter, five setups; 6-month pilot with cost estimate |
 | 5 to 6 | Full 24-month runs on two model families; sub-experiments |
 | 7 to 8 | Results, write-up, public repo v1.0; gate decision |
 
 **Open questions:**
 
-- [ ] Which 24-month window? Including 2020 to 2021 adds strong traps but also strong model priors.
+- [ ] Which 24-month window? Proposed: August 2024 to July 2026. It holds the Hawaiian and Silver exits and the late-filing months, and most of it falls after current models' training cutoffs, so answers cannot come from prior knowledge. 2020 to 2021 has stronger breaks but every model knows about them.
 - [ ] As-of dates: start from BTS's stated lag of about 10 weeks. The TranStats release page shows when months were added and updated; can its history be recovered for the chosen window, or only archived from now on?
-- [ ] Does the supplied database hold final figures only? If so, which candidate traps survive without snapshots?
+- [x] Does the database hold final figures only? It holds each month as served on the fetch date. Late filing shows in the newest months; corrections to older months look rare (see The world).
 - [ ] Which model does the Debrief review engine use? Core's default is under review (core PRD 1, C13); settle it before the pilot and keep it fixed through the runs.
 - [ ] If Hex releases Metric City, run the same memory setups on it as a second, synthetic world?
 - [ ] What tolerance counts as correct for ratios and rankings?
