@@ -9,7 +9,7 @@ datapitfalls bench. The product spec is **docs/PRD.md**: read it before starting
 ## Family and contracts
 
 - Builds on [datapitfalls](https://github.com/bjonesdataliteracy/datapitfalls) (core engine, taxonomy, MCP). Use its public exports only, never internals.
-- Shared data shapes (Finding, Transcript, Memory record, Trap) come from `@datapitfalls/schemas` (core PRD requirement C1). Until it ships, mirror the PRD's field lists and mark the code with `TODO(schemas)`.
+- Shared data shapes (Finding, Transcript, Memory record, Trap) come from `@datapitfalls/schemas` (on npm since 0.1.0). Import them; don't redefine them here.
 - Every finding, trap and memory cites at least one taxonomy rule ID.
 
 ## Principles
