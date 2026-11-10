@@ -6,3 +6,9 @@ dist/
 .DS_Store
 runs/*
 !runs/.gitkeep
+
+# Benchmark database and its download cache (rebuild with data/build_database.py)
+data/raw/
+data/*.db
+data/*.db-*
+__pycache__/

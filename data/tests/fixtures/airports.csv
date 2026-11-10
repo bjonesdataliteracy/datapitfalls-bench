@@ -1,0 +1,4 @@
+id,ident,type,name,latitude_deg,longitude_deg,elevation_ft,iso_country,iso_region,municipality,scheduled_service,iata_code
+1,KAAA,large_airport,FIXTURE Alpha,47.4,-122.3,433,US,US-WA,Alphaville,yes,AAA
+2,KBBB,medium_airport,FIXTURE Bravo,40.6,-73.8,13,US,US-NY,Bravotown,yes,BBB
+3,KCCC,closed,FIXTURE Closed Field,45.0,-100.0,,US,US-SD,,no,

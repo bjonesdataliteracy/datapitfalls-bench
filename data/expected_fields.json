@@ -1,0 +1,26 @@
+{
+  "_comment": "Columns the builder reads from the dimension files. A file's header is checked against these before any row loads; extra columns are ignored, a missing one fails the build. T-100 columns are listed in COLUMNS in build_database.py.",
+  "ourairports_airports": [
+    "id",
+    "ident",
+    "type",
+    "name",
+    "latitude_deg",
+    "longitude_deg",
+    "elevation_ft",
+    "iso_country",
+    "iso_region",
+    "municipality",
+    "scheduled_service",
+    "iata_code"
+  ],
+  "ourairports_countries": [
+    "code",
+    "name",
+    "continent"
+  ],
+  "bts_lookup": [
+    "Code",
+    "Description"
+  ]
+}
