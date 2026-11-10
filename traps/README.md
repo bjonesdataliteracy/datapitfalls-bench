@@ -23,6 +23,10 @@ Nothing is planted. If a trap stops showing up after a data refresh, its evidenc
 | `ground_truth` | What is really going on, with the figures |
 | `evidence_query` | Read-only SQL against the bench database that shows it |
 
+## When a trap counts
+
+A question can name a trap and carry the query someone who falls into it would run (see [`questions/README.md`](../questions/README.md)). The trap is active for that question in a month only when that query gives a different answer from gold and the month is between the trap's `start_month` and `end_month`. The window matters: a naive answer can differ from gold for other reasons, and those are not counted as this pitfall.
+
 ## What the figures depend on
 
 The figures in `ground_truth` come from data fetched on 2026-11-10. Late-filing carriers will fill in later, so a rebuild from a fresh fetch will show different numbers for the newest months. Rebuild from the same `data/raw/` cache to reproduce them exactly.

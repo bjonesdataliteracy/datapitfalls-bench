@@ -42,7 +42,7 @@ test('every data trap carries a read-only evidence query', () => {
     assert.doesNotMatch(
       trap.evidence_query,
       /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|ATTACH|PRAGMA)\b/i,
-      `${trap.id}: evidence_query must only read`,
+      `${trap.id}: evidence_query must only read`
     );
   }
 });

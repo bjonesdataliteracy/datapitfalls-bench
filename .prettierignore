@@ -1,0 +1,7 @@
+dist/
+node_modules/
+data/
+runs/
+package-lock.json
+*.md
+*.yaml

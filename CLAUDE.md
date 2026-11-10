@@ -16,7 +16,16 @@ datapitfalls bench. The product spec is **docs/PRD.md**: read it before starting
 
 - Local-first; never send user data anywhere without explicit opt-in.
 - Read-only access to data; never write to a user's warehouse.
-- TypeScript, Node 18+, matching the core repo's tooling (ESLint, Prettier, `node --test`).
+- TypeScript, matching the core repo's tooling (ESLint, Prettier, `node --test`). Node 22.13+, because the harness reads SQLite through the built-in `node:sqlite`. The data builder and trap scanner in `data/` are Python, standard library only.
+- Gold answers and trap answers are for scoring. Never show them, or the question file, to an agent under test.
+
+## The gate (run before committing code)
+
+```
+npm test && npm run lint
+```
+
+`npm test` builds first. Checks that need the real database (`npm run check:evidence`, `datapitfalls-bench check`) are run by hand; say whether you ran them.
 
 ## Branches
 
