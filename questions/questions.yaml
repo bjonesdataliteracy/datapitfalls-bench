@@ -1,0 +1,473 @@
+# datapitfalls bench: question set (PRD 2, B3)
+#
+# Every question is asked each month of the replay. Its gold answer is computed
+# by gold_sql against the data visible that month; no model writes or checks a
+# gold answer. A question with `traps` is trap-adjacent: each trap carries the
+# query an analyst who falls into it would run, so the scorer can tell a
+# pitfall error from an ordinary miss. A trap counts as active in a month only
+# when that query gives a different answer from the gold one.
+#
+# "Scheduled" always means service class F. Parameters available to every
+# query: :t (newest visible month as year*12+month-1), :y/:m (that month),
+# :py/:pm (same month a year earlier), :ly/:lm (the month before).
+#
+# Standards are the business rules the gold answers apply. They reach the
+# agent through the business-context timeline (B4), not through the question
+# text, so remembering them is part of what the benchmark measures.
+
+standards:
+  - id: load-factor-definition
+    text: Load factor is total passengers divided by total seats, never an average of per-row or per-route load factors.
+  - id: like-for-like-carriers
+    text: Year-over-year comparisons count only carriers that have filed for both months, because some carriers file late. Hawaiian counts as part of Alaska in every period.
+  - id: alaska-includes-hawaiian
+    introduced: "2026-01"
+    text: From January 2026 Hawaiian Airlines flights are reported under Alaska's code (AS). Year-over-year figures for Alaska compare Alaska plus Hawaiian in both periods.
+  - id: growth-ranking-floor
+    text: Growth rankings cover only airports with at least 100,000 scheduled passengers in the base period.
+  - id: city-means-market
+    text: A city means its BTS city market, so every airport in the market counts (New York includes Newark, Washington includes Baltimore).
+  - id: state-from-t100
+    text: State totals include every airport that the T-100 data assigns to the state.
+  - id: distance-standardized-comparison
+    text: When two carriers' load factors are compared, compare them within distance bands (under 500, 500 to 999, 1,000 to 1,999, and 2,000 or more miles) and combine the bands using the two carriers' total seats in each band as weights.
+
+questions:
+  # ---- Trap-adjacent ------------------------------------------------------
+
+  - id: international-passengers-yoy
+    category: trend
+    text: By what percent did scheduled international passengers change in {latest_month} compared with {prior_year_month}?
+    answer: { type: percent, unit: percent, tolerance: { absolute: 0.5 } }
+    standards: [like-for-like-carriers, alaska-includes-hawaiian]
+    gold_sql: |
+      WITH both AS (
+        SELECT (CASE WHEN carrier_code = 'HA' THEN 'AS' ELSE carrier_code END) FROM segments WHERE year = :y AND month = :m AND scope = 'international' AND service_class = 'F'
+        INTERSECT
+        SELECT (CASE WHEN carrier_code = 'HA' THEN 'AS' ELSE carrier_code END) FROM segments WHERE year = :py AND month = :pm AND scope = 'international' AND service_class = 'F'
+      )
+      SELECT ROUND(100.0 * (SUM(CASE WHEN year = :y THEN passengers END) * 1.0
+                          / SUM(CASE WHEN year = :py THEN passengers END) - 1), 2)
+      FROM segments
+      WHERE ((year = :y AND month = :m) OR (year = :py AND month = :pm))
+        AND scope = 'international' AND service_class = 'F'
+        AND (CASE WHEN carrier_code = 'HA' THEN 'AS' ELSE carrier_code END) IN (SELECT * FROM both)
+    traps:
+      - id: late-filing-newest-months
+        sql: |
+          SELECT ROUND(100.0 * (SUM(CASE WHEN year = :y THEN passengers END) * 1.0
+                              / SUM(CASE WHEN year = :py THEN passengers END) - 1), 2)
+          FROM segments
+          WHERE ((year = :y AND month = :m) OR (year = :py AND month = :pm))
+            AND scope = 'international' AND service_class = 'F'
+
+  - id: total-passengers-yoy
+    category: trend
+    text: By what percent did total scheduled passengers, domestic and international together, change in {latest_month} compared with {prior_year_month}?
+    answer: { type: percent, unit: percent, tolerance: { absolute: 0.5 } }
+    standards: [like-for-like-carriers, alaska-includes-hawaiian]
+    gold_sql: |
+      WITH both AS (
+        SELECT (CASE WHEN carrier_code = 'HA' THEN 'AS' ELSE carrier_code END) FROM segments WHERE year = :y AND month = :m AND service_class = 'F'
+        INTERSECT
+        SELECT (CASE WHEN carrier_code = 'HA' THEN 'AS' ELSE carrier_code END) FROM segments WHERE year = :py AND month = :pm AND service_class = 'F'
+      )
+      SELECT ROUND(100.0 * (SUM(CASE WHEN year = :y THEN passengers END) * 1.0
+                          / SUM(CASE WHEN year = :py THEN passengers END) - 1), 2)
+      FROM segments
+      WHERE ((year = :y AND month = :m) OR (year = :py AND month = :pm))
+        AND service_class = 'F'
+        AND (CASE WHEN carrier_code = 'HA' THEN 'AS' ELSE carrier_code END) IN (SELECT * FROM both)
+    traps:
+      - id: late-filing-newest-months
+        sql: |
+          SELECT ROUND(100.0 * (SUM(CASE WHEN year = :y THEN passengers END) * 1.0
+                              / SUM(CASE WHEN year = :py THEN passengers END) - 1), 2)
+          FROM segments
+          WHERE ((year = :y AND month = :m) OR (year = :py AND month = :pm))
+            AND service_class = 'F'
+
+  - id: alaska-passengers-yoy
+    category: trend
+    text: By what percent did Alaska Airlines' scheduled passengers change in {latest_month} compared with {prior_year_month}?
+    answer: { type: percent, unit: percent, tolerance: { absolute: 0.5 } }
+    standards: [alaska-includes-hawaiian]
+    # 24312 is January 2026: from then on Hawaiian's flights sit under AS.
+    gold_sql: |
+      SELECT ROUND(100.0 * (SUM(CASE WHEN year = :y THEN passengers END) * 1.0
+                          / SUM(CASE WHEN year = :py THEN passengers END) - 1), 2)
+      FROM segments
+      WHERE ((year = :y AND month = :m) OR (year = :py AND month = :pm))
+        AND service_class = 'F'
+        AND (carrier_code = 'AS' OR (carrier_code = 'HA' AND :t >= 24312))
+    traps:
+      - id: hawaiian-stops-reporting
+        sql: |
+          SELECT ROUND(100.0 * (SUM(CASE WHEN year = :y THEN passengers END) * 1.0
+                              / SUM(CASE WHEN year = :py THEN passengers END) - 1), 2)
+          FROM segments
+          WHERE ((year = :y AND month = :m) OR (year = :py AND month = :pm))
+            AND service_class = 'F' AND carrier_code = 'AS'
+
+  - id: florida-departing-passengers
+    category: level
+    text: How many scheduled domestic passengers boarded flights at Florida airports in {latest_month}?
+    answer: { type: number, unit: passengers }
+    standards: [state-from-t100]
+    gold_sql: |
+      SELECT SUM(passengers) FROM segments
+      WHERE year = :y AND month = :m AND scope = 'domestic' AND service_class = 'F' AND origin_state = 'FL'
+    traps:
+      - id: airport-join-drops-palm-beach
+        sql: |
+          SELECT SUM(s.passengers) FROM segments s
+          JOIN airports a ON a.iata_code = s.origin
+          WHERE s.year = :y AND s.month = :m AND s.scope = 'domestic' AND s.service_class = 'F'
+            AND a.iso_region = 'US-FL'
+
+  - id: fastest-growing-airport
+    category: ranking
+    text: Which origin airport had the fastest percent growth in scheduled passengers over the 12 months ending {latest_month}, compared with the 12 months before that? Answer with the airport code.
+    answer: { type: entity, unit: airport code }
+    standards: [growth-ranking-floor]
+    gold_sql: |
+      SELECT origin FROM (
+        SELECT origin,
+               SUM(CASE WHEN year * 12 + month - 1 BETWEEN :t - 23 AND :t - 12 THEN passengers END) AS base,
+               SUM(CASE WHEN year * 12 + month - 1 BETWEEN :t - 11 AND :t THEN passengers END) AS latest
+        FROM segments
+        WHERE service_class = 'F' AND year * 12 + month - 1 BETWEEN :t - 23 AND :t
+        GROUP BY origin)
+      WHERE base >= 100000 AND latest IS NOT NULL
+      ORDER BY 1.0 * latest / base DESC, origin LIMIT 1
+    traps:
+      - id: tiny-airports-top-growth-rankings
+        sql: |
+          SELECT origin FROM (
+            SELECT origin,
+                   SUM(CASE WHEN year * 12 + month - 1 BETWEEN :t - 23 AND :t - 12 THEN passengers END) AS base,
+                   SUM(CASE WHEN year * 12 + month - 1 BETWEEN :t - 11 AND :t THEN passengers END) AS latest
+            FROM segments
+            WHERE service_class = 'F' AND year * 12 + month - 1 BETWEEN :t - 23 AND :t
+            GROUP BY origin)
+          WHERE base > 0 AND latest IS NOT NULL
+          ORDER BY 1.0 * latest / base DESC, origin LIMIT 1
+
+  - id: skywest-load-factor
+    category: level
+    text: What was SkyWest's load factor on scheduled domestic flights in {latest_month}?
+    answer: { type: percent, unit: percent, tolerance: { absolute: 0.5 } }
+    standards: [load-factor-definition]
+    gold_sql: |
+      SELECT ROUND(100.0 * SUM(passengers) / SUM(seats), 2) FROM segments
+      WHERE year = :y AND month = :m AND scope = 'domestic' AND service_class = 'F'
+        AND seats > 0 AND carrier_code = 'OO'
+    traps:
+      - id: load-factor-average-of-rates
+        sql: |
+          SELECT ROUND(100 * AVG(1.0 * passengers / seats), 2) FROM segments
+          WHERE year = :y AND month = :m AND scope = 'domestic' AND service_class = 'F'
+            AND seats > 0 AND carrier_code = 'OO'
+
+  - id: domestic-load-factor
+    category: level
+    text: What was the overall load factor on scheduled domestic flights in {latest_month}?
+    answer: { type: percent, unit: percent, tolerance: { absolute: 0.5 } }
+    standards: [load-factor-definition]
+    gold_sql: |
+      SELECT ROUND(100.0 * SUM(passengers) / SUM(seats), 2) FROM segments
+      WHERE year = :y AND month = :m AND scope = 'domestic' AND service_class = 'F' AND seats > 0
+    traps:
+      - id: load-factor-average-of-rates
+        sql: |
+          SELECT ROUND(100 * AVG(1.0 * passengers / seats), 2) FROM segments
+          WHERE year = :y AND month = :m AND scope = 'domestic' AND service_class = 'F' AND seats > 0
+
+  - id: highest-load-factor-carrier
+    category: ranking
+    text: Among carriers with at least 5 million scheduled domestic passengers in the 12 months ending {latest_month}, which had the highest load factor over those 12 months? Answer with the carrier code.
+    answer: { type: entity, unit: carrier code }
+    standards: [load-factor-definition]
+    gold_sql: |
+      SELECT carrier_code, MAX(carrier_name) FROM segments
+      WHERE year * 12 + month - 1 BETWEEN :t - 11 AND :t
+        AND scope = 'domestic' AND service_class = 'F' AND seats > 0
+      GROUP BY carrier_code HAVING SUM(passengers) >= 5000000
+      ORDER BY 1.0 * SUM(passengers) / SUM(seats) DESC, carrier_code LIMIT 1
+    traps:
+      - id: load-factor-average-of-rates
+        sql: |
+          SELECT carrier_code, MAX(carrier_name) FROM segments
+          WHERE year * 12 + month - 1 BETWEEN :t - 11 AND :t
+            AND scope = 'domestic' AND service_class = 'F' AND seats > 0
+          GROUP BY carrier_code HAVING SUM(passengers) >= 5000000
+          ORDER BY AVG(1.0 * passengers / seats) DESC, carrier_code LIMIT 1
+
+  - id: new-york-departing-passengers
+    category: level
+    text: How many scheduled passengers boarded flights in New York in {latest_month}?
+    answer: { type: number, unit: passengers }
+    standards: [city-means-market]
+    gold_sql: |
+      SELECT SUM(passengers) FROM segments
+      WHERE year = :y AND month = :m AND service_class = 'F'
+        AND origin_city_market_id = (SELECT MAX(origin_city_market_id) FROM segments WHERE origin = 'JFK')
+    traps:
+      - id: city-means-one-airport-or-several
+        sql: |
+          SELECT SUM(passengers) FROM segments
+          WHERE year = :y AND month = :m AND service_class = 'F' AND origin_city_name LIKE 'New York, NY%'
+
+  - id: washington-departing-passengers
+    category: level
+    text: How many scheduled passengers boarded flights in Washington, DC in {latest_month}?
+    answer: { type: number, unit: passengers }
+    standards: [city-means-market]
+    gold_sql: |
+      SELECT SUM(passengers) FROM segments
+      WHERE year = :y AND month = :m AND service_class = 'F'
+        AND origin_city_market_id = (SELECT MAX(origin_city_market_id) FROM segments WHERE origin = 'DCA')
+    traps:
+      - id: city-means-one-airport-or-several
+        sql: |
+          SELECT SUM(passengers) FROM segments
+          WHERE year = :y AND month = :m AND service_class = 'F' AND origin_city_name LIKE 'Washington, DC%'
+
+  - id: alaska-or-envoy-fuller-planes
+    category: comparison
+    text: Over the 12 months ending {latest_month}, which carrier filled its scheduled domestic flights better, Alaska Airlines (AS) or Envoy Air (MQ)? Answer with the carrier code.
+    answer: { type: entity, unit: carrier code }
+    standards: [load-factor-definition, distance-standardized-comparison]
+    gold_sql: |
+      WITH bands AS (
+        SELECT carrier_code,
+               CASE WHEN distance_miles < 500 THEN 1 WHEN distance_miles < 1000 THEN 2
+                    WHEN distance_miles < 2000 THEN 3 ELSE 4 END AS band,
+               SUM(passengers) AS pax, SUM(seats) AS seats
+        FROM segments
+        WHERE year * 12 + month - 1 BETWEEN :t - 11 AND :t
+          AND scope = 'domestic' AND service_class = 'F' AND seats > 0
+          AND carrier_code IN ('AS', 'MQ')
+        GROUP BY carrier_code, band),
+      weights AS (
+        SELECT band, SUM(seats) AS w FROM bands GROUP BY band HAVING COUNT(*) = 2)
+      SELECT b.carrier_code FROM bands b JOIN weights w ON w.band = b.band
+      GROUP BY b.carrier_code
+      ORDER BY SUM(w.w * b.pax * 1.0 / b.seats) / SUM(w.w) DESC LIMIT 1
+    traps:
+      - id: envoy-load-factor-reversal
+        sql: |
+          SELECT carrier_code FROM segments
+          WHERE year * 12 + month - 1 BETWEEN :t - 11 AND :t
+            AND scope = 'domestic' AND service_class = 'F' AND seats > 0
+            AND carrier_code IN ('AS', 'MQ')
+          GROUP BY carrier_code
+          ORDER BY 1.0 * SUM(passengers) / SUM(seats) DESC LIMIT 1
+
+  # ---- Controls -----------------------------------------------------------
+
+  - id: domestic-passengers
+    category: level
+    text: How many scheduled domestic passengers were carried in {latest_month}?
+    answer: { type: number, unit: passengers }
+    gold_sql: |
+      SELECT SUM(passengers) FROM segments
+      WHERE year = :y AND month = :m AND scope = 'domestic' AND service_class = 'F'
+
+  - id: domestic-passengers-trailing-12
+    category: level
+    text: How many scheduled domestic passengers were carried in the 12 months from {window_start} through {latest_month}?
+    answer: { type: number, unit: passengers }
+    gold_sql: |
+      SELECT SUM(passengers) FROM segments
+      WHERE year * 12 + month - 1 BETWEEN :t - 11 AND :t AND scope = 'domestic' AND service_class = 'F'
+
+  - id: domestic-passengers-month-over-month
+    category: trend
+    text: By what percent did scheduled domestic passengers change from {previous_month} to {latest_month}?
+    answer: { type: percent, unit: percent, tolerance: { absolute: 0.25 } }
+    gold_sql: |
+      SELECT ROUND(100.0 * (SUM(CASE WHEN year = :y AND month = :m THEN passengers END) * 1.0
+                          / SUM(CASE WHEN year = :ly AND month = :lm THEN passengers END) - 1), 2)
+      FROM segments
+      WHERE ((year = :y AND month = :m) OR (year = :ly AND month = :lm))
+        AND scope = 'domestic' AND service_class = 'F'
+
+  - id: largest-domestic-carrier
+    category: ranking
+    text: Which carrier carried the most scheduled domestic passengers in {latest_month}? Answer with the carrier code.
+    answer: { type: entity, unit: carrier code }
+    gold_sql: |
+      SELECT carrier_code, MAX(carrier_name) FROM segments
+      WHERE year = :y AND month = :m AND scope = 'domestic' AND service_class = 'F'
+      GROUP BY carrier_code ORDER BY SUM(passengers) DESC, carrier_code LIMIT 1
+
+  - id: largest-domestic-carrier-share
+    category: share
+    text: What share of scheduled domestic passengers did the largest carrier have in {latest_month}?
+    answer: { type: percent, unit: percent, tolerance: { absolute: 0.25 } }
+    gold_sql: |
+      SELECT ROUND(100.0 * MAX(pax) / SUM(pax), 2) FROM (
+        SELECT SUM(passengers) AS pax FROM segments
+        WHERE year = :y AND month = :m AND scope = 'domestic' AND service_class = 'F'
+        GROUP BY carrier_code)
+
+  - id: top-three-international-carriers
+    category: ranking
+    text: Which three carriers carried the most scheduled international passengers in {latest_month}, in order? Answer with carrier codes.
+    answer: { type: list, unit: carrier codes }
+    gold_sql: |
+      SELECT carrier_code FROM segments
+      WHERE year = :y AND month = :m AND scope = 'international' AND service_class = 'F'
+      GROUP BY carrier_code ORDER BY SUM(passengers) DESC, carrier_code LIMIT 3
+
+  - id: international-share
+    category: share
+    text: What share of all scheduled passengers in {latest_month} flew on international flights?
+    answer: { type: percent, unit: percent, tolerance: { absolute: 0.25 } }
+    gold_sql: |
+      SELECT ROUND(100.0 * SUM(CASE WHEN scope = 'international' THEN passengers END) / SUM(passengers), 2)
+      FROM segments WHERE year = :y AND month = :m AND service_class = 'F'
+
+  - id: busiest-domestic-route
+    category: ranking
+    text: Which one-way domestic route carried the most scheduled passengers in {latest_month}? Answer as ORIGIN-DEST airport codes.
+    answer: { type: entity, unit: route }
+    gold_sql: |
+      SELECT origin || '-' || dest FROM segments
+      WHERE year = :y AND month = :m AND scope = 'domestic' AND service_class = 'F'
+      GROUP BY origin, dest ORDER BY SUM(passengers) DESC, origin, dest LIMIT 1
+
+  - id: top-five-airports
+    category: ranking
+    text: Which five airports had the most scheduled passengers boarding in {latest_month}, in order? Answer with airport codes.
+    answer: { type: list, unit: airport codes }
+    gold_sql: |
+      SELECT origin FROM segments
+      WHERE year = :y AND month = :m AND service_class = 'F'
+      GROUP BY origin ORDER BY SUM(passengers) DESC, origin LIMIT 5
+
+  - id: seattle-tacoma-departing-passengers
+    category: level
+    text: How many scheduled passengers boarded flights at Seattle-Tacoma (SEA) in {latest_month}?
+    answer: { type: number, unit: passengers }
+    gold_sql: |
+      SELECT SUM(passengers) FROM segments
+      WHERE year = :y AND month = :m AND service_class = 'F' AND origin = 'SEA'
+
+  - id: denver-top-destination
+    category: ranking
+    text: Which destination airport received the most scheduled passengers from Denver (DEN) in {latest_month}? Answer with the airport code.
+    answer: { type: entity, unit: airport code }
+    gold_sql: |
+      SELECT dest FROM segments
+      WHERE year = :y AND month = :m AND service_class = 'F' AND origin = 'DEN'
+      GROUP BY dest ORDER BY SUM(passengers) DESC, dest LIMIT 1
+
+  - id: atlanta-nonstop-destinations
+    category: level
+    text: How many different airports had scheduled nonstop passenger flights from Atlanta (ATL) in {latest_month}?
+    answer: { type: number, unit: airports, tolerance: { absolute: 0, relative: 0 } }
+    gold_sql: |
+      SELECT COUNT(DISTINCT dest) FROM segments
+      WHERE year = :y AND month = :m AND service_class = 'F' AND origin = 'ATL' AND passengers > 0
+
+  - id: delta-share-at-atlanta
+    category: share
+    text: What share of scheduled passengers boarding at Atlanta (ATL) in {latest_month} flew on Delta (DL)?
+    answer: { type: percent, unit: percent, tolerance: { absolute: 0.25 } }
+    gold_sql: |
+      SELECT ROUND(100.0 * SUM(CASE WHEN carrier_code = 'DL' THEN passengers END) / SUM(passengers), 2)
+      FROM segments WHERE year = :y AND month = :m AND service_class = 'F' AND origin = 'ATL'
+
+  - id: honolulu-largest-carrier
+    category: ranking
+    text: Which carrier boarded the most scheduled passengers at Honolulu (HNL) in {latest_month}? Answer with the carrier code.
+    answer: { type: entity, unit: carrier code }
+    gold_sql: |
+      SELECT carrier_code, MAX(carrier_name) FROM segments
+      WHERE year = :y AND month = :m AND service_class = 'F' AND origin = 'HNL'
+      GROUP BY carrier_code ORDER BY SUM(passengers) DESC, carrier_code LIMIT 1
+
+  - id: ohare-rank
+    category: ranking
+    text: Where did Chicago O'Hare (ORD) rank among all airports by scheduled passengers boarding in {latest_month}? Answer with the rank as a number, 1 being the busiest.
+    answer: { type: number, unit: rank, tolerance: { absolute: 0, relative: 0 } }
+    gold_sql: |
+      SELECT 1 + COUNT(*) FROM (
+        SELECT origin, SUM(passengers) AS pax FROM segments
+        WHERE year = :y AND month = :m AND service_class = 'F' GROUP BY origin)
+      WHERE pax > (SELECT SUM(passengers) FROM segments
+                   WHERE year = :y AND month = :m AND service_class = 'F' AND origin = 'ORD')
+
+  - id: jfk-lax-seats
+    category: level
+    text: How many scheduled seats were flown from New York JFK to Los Angeles (LAX) in {latest_month}?
+    answer: { type: number, unit: seats }
+    gold_sql: |
+      SELECT SUM(seats) FROM segments
+      WHERE year = :y AND month = :m AND service_class = 'F' AND origin = 'JFK' AND dest = 'LAX'
+
+  - id: southwest-departures
+    category: level
+    text: How many scheduled departures did Southwest (WN) perform in {latest_month}?
+    answer: { type: number, unit: departures }
+    gold_sql: |
+      SELECT SUM(departures_performed) FROM segments
+      WHERE year = :y AND month = :m AND service_class = 'F' AND carrier_code = 'WN'
+
+  - id: breeze-passengers
+    category: level
+    text: How many scheduled passengers did Breeze Airways (MX) carry in {latest_month}?
+    answer: { type: number, unit: passengers }
+    gold_sql: |
+      SELECT SUM(passengers) FROM segments
+      WHERE year = :y AND month = :m AND service_class = 'F' AND carrier_code = 'MX'
+
+  - id: average-domestic-trip-length
+    category: level
+    text: What was the average flight distance in miles flown by a scheduled domestic passenger in {latest_month}, weighting each flight by its passengers?
+    answer: { type: number, unit: miles }
+    gold_sql: |
+      SELECT ROUND(1.0 * SUM(passengers * distance_miles) / SUM(passengers), 1) FROM segments
+      WHERE year = :y AND month = :m AND scope = 'domestic' AND service_class = 'F'
+
+  - id: top-foreign-destination-country
+    category: ranking
+    text: Which foreign country received the most scheduled passengers on flights from the United States in {latest_month}? Answer with the two-letter country code.
+    answer: { type: entity, unit: country code }
+    gold_sql: |
+      SELECT s.dest_country, MAX(c.name) FROM segments s
+      LEFT JOIN countries c ON c.iso_code = s.dest_country
+      WHERE s.year = :y AND s.month = :m AND s.scope = 'international' AND s.service_class = 'F'
+        AND s.origin_country = 'US' AND s.dest_country <> 'US'
+      GROUP BY s.dest_country ORDER BY SUM(s.passengers) DESC, s.dest_country LIMIT 1
+
+  - id: carriers-over-100k
+    category: level
+    text: How many carriers carried at least 100,000 scheduled passengers in {latest_month}?
+    answer: { type: number, unit: carriers, tolerance: { absolute: 0, relative: 0 } }
+    gold_sql: |
+      SELECT COUNT(*) FROM (
+        SELECT carrier_code FROM segments
+        WHERE year = :y AND month = :m AND service_class = 'F'
+        GROUP BY carrier_code HAVING SUM(passengers) >= 100000)
+
+  - id: top-freight-airport
+    category: ranking
+    text: Which origin airport loaded the most freight by weight in {latest_month}, across all service classes? Answer with the airport code.
+    answer: { type: entity, unit: airport code }
+    gold_sql: |
+      SELECT origin FROM segments
+      WHERE year = :y AND month = :m
+      GROUP BY origin ORDER BY SUM(freight_lbs) DESC, origin LIMIT 1
+
+  - id: most-used-aircraft-type
+    category: ranking
+    text: Which aircraft type carried the most scheduled domestic passengers in {latest_month}? Answer with the BTS aircraft type code or its name.
+    answer: { type: entity, unit: aircraft type }
+    gold_sql: |
+      SELECT s.aircraft_type_id, MAX(a.aircraft_name) FROM segments s
+      LEFT JOIN aircraft_types a ON a.aircraft_type_id = s.aircraft_type_id
+      WHERE s.year = :y AND s.month = :m AND s.scope = 'domestic' AND s.service_class = 'F'
+      GROUP BY s.aircraft_type_id ORDER BY SUM(s.passengers) DESC, s.aircraft_type_id LIMIT 1

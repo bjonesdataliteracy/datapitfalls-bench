@@ -15,7 +15,7 @@ The traps are real, not planted: partial months, carriers that stop reporting af
 
 🚧 **Pre-release.** The design is in [docs/PRD.md](docs/PRD.md). The harness is being built in the open; follow along or open an issue with ideas.
 
-Built so far: the [database builder](data/README.md) and the [trap scanner and first trap catalog](traps/README.md). Not yet built: the replay engine, questions, agent adapters, memory setups and scorer.
+Built so far: the [database builder](data/README.md), the [trap scanner and first trap catalog](traps/README.md), the as-of replay engine and the [first question set](questions/README.md). Not yet built: the business-context timeline, agent adapters, memory setups and scorer.
 
 ## Part of the datapitfalls family
 

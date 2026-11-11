@@ -16,7 +16,7 @@
 
 - id: late-filing-newest-months
   kind: data
-  start_month: "2026-06"
+  start_month: "2026-03"
   pitfall_ids: [partial-period-aggregation, uneven-aggregation-coverage]
   affected_questions: []
   ground_truth: >-
@@ -27,7 +27,9 @@
     Canada in June, and others). International passengers read as down about
     9% year over year in those two months, against 1% to 5% down in the four
     months before. Most of that extra drop is missing filings, not lost
-    traffic.
+    traffic. Smaller gaps of the same kind reach back to March 2026, where
+    late filers move the international year-over-year figure by one to
+    three points.
   evidence_query: |
     SELECT a.carrier_code, MAX(a.carrier_name) AS carrier, SUM(a.passengers) AS pax_july_2025
     FROM segments a
