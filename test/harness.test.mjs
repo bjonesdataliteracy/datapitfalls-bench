@@ -57,6 +57,11 @@ test('announce-once shows a memo only in its month; always repeats it', () => {
     ['alaska-includes-hawaiian']
   );
   assert.equal(contextFor(timeline, '2026-03', '2024-08', 'always').memos.length, 7);
+  assert.equal(contextFor(timeline, '2024-08', '2024-08', 'never').memos.length, 0);
+  assert.doesNotMatch(
+    renderContext(contextFor(timeline, '2024-08', '2024-08', 'never')),
+    /Reporting standards/
+  );
   assert.equal(
     contextFor(timeline, '2026-03', '2024-08', 'always').persona.name,
     'Investor relations'
@@ -243,6 +248,8 @@ test('parallel tool calls are answered together in one message, and notes are ke
     client.requests[0].tools.map((t) => t.name),
     ['run_sql', 'submit_answer', 'remember']
   );
+  // The agent is told plainly that standards are not repeated and should be saved.
+  assert.match(client.requests[0].system[0].text, /announced once and never repeated/);
 });
 
 test('a session that never submits ends with a reason, not an answer', async () => {

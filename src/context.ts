@@ -22,8 +22,11 @@ export interface Timeline {
   memos: Memo[];
 }
 
-/** 'announce-once': a memo appears only in its own month. 'always': every memo issued so far. */
-export type ContextMode = 'announce-once' | 'always';
+/**
+ * 'announce-once': a memo appears only in its own month. 'always': every memo
+ * issued so far. 'never': no memos at all, to see what an agent does unaided.
+ */
+export type ContextMode = 'announce-once' | 'always' | 'never';
 
 interface RawMemo {
   month?: string;
@@ -85,9 +88,10 @@ export function contextFor(
   const first = monthIndex(firstMonth);
   const persona = [...timeline.personas].reverse().find((p) => monthIndex(p.from) <= t);
   const issued = (m: Memo): number => Math.max(monthIndex(m.month), first);
-  const memos = timeline.memos.filter((m) =>
-    mode === 'always' ? issued(m) <= t : issued(m) === t
-  );
+  const memos =
+    mode === 'never'
+      ? []
+      : timeline.memos.filter((m) => (mode === 'always' ? issued(m) <= t : issued(m) === t));
   return { persona: persona ?? (timeline.personas[0] as Persona), memos };
 }
 

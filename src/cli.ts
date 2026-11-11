@@ -26,7 +26,7 @@ const USAGE = `datapitfalls-bench
              Ask every question in every month and report gaps and active traps.
   run        --db <bench.db> --from YYYY-MM --to YYYY-MM --out <folder> --budget <usd>
              [--setups none,log-all,cache,pitfall,debrief] [--model <id>] [--effort medium]
-             [--review-model <id>] [--max-reviews 12] [--context-mode announce-once|always]
+             [--review-model <id>] [--max-reviews 12] [--context-mode announce-once|always|never]
              [--only id1,id2] [--max-steps 12] [--concurrency 4] [--seed 1] [--keep-asof]
              Run the benchmark. THIS CALLS A PAID API and stops at --budget.
              --dry-run runs the whole harness with a scripted agent, spends nothing,
