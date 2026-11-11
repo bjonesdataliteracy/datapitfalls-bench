@@ -25,7 +25,11 @@ datapitfalls bench. The product spec is **docs/PRD.md**: read it before starting
 npm test && npm run lint
 ```
 
-`npm test` builds first. Checks that need the real database (`npm run check:evidence`, `datapitfalls-bench check`) are run by hand; say whether you ran them.
+`npm test` builds first and never calls an API. Checks that need the real database (`npm run check:evidence`, `datapitfalls-bench check`) are run by hand; say whether you ran them.
+
+## Spending
+
+`datapitfalls-bench run` without `--dry-run` or a scripted `--agent` calls a paid API. Never start a live run without the maintainer's explicit go-ahead for that run and its budget. Use `--dry-run` freely.
 
 ## Branches
 
