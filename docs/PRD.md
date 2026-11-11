@@ -118,7 +118,21 @@ The comparison is setup 5 (pitfall-steered memory plus Debrief) against setup 3 
 
 ### Cost
 
-A full pass is 5 setups × 24 months × about 50 questions, or about 6,000 agent sessions per model family and seed. Two families and 3 seeds make about 36,000 sessions before sub-experiments and Debrief runs. The 6-month pilot (B8) measures cost per session; the seed count, question count and per-setup budget cap are set from that number, and the plan is cut to fit the budget before the full run, not during it.
+Measured on Nov 11, 2026, on `claude-opus-5-5` at medium effort ([details](live-trial-2026-11.md)): an agent session costs about $0.02 and a Debrief review about $0.03. Sessions take two to three model requests, and most of the prompt is served from cache.
+
+| Run | Sessions | Estimate |
+| --- | --- | --- |
+| 6-month pilot, 5 setups, 34 questions | 1,020 | about $23 |
+| 24 months, 5 setups, 34 questions, one repeat | 4,080 | $100 to $150 |
+| The same, 3 repeats | 12,240 | $300 to $450 |
+
+These rest on 84 live sessions and on estimated, not billed, cost. The log-everything setup has not been run live. Cost is no longer a reason to cut setups or questions; every paid run still needs a `--budget` and the maintainer's go-ahead.
+
+### What the first live runs showed
+
+A no-memory diagnostic on July 2026 ([details](live-trial-2026-11.md)) scored 82% with no standards given and 97% with all of them given. All 23 controls were answered correctly both times. Of the 11 trap-adjacent questions, five were answered correctly with no help at all: this model does not fall for the load-factor, Florida-join or Hawaiian traps. The other six turn on a house rule the agent cannot guess, and it applied each rule once told.
+
+So on this model the room for memory is about 15 points, and all of it comes from remembering six business rules. As built, the benchmark measures whether a memory setup keeps team decisions; it cannot yet separate pitfall-steered memory from plain note-keeping. That has to be resolved before the pilot is worth reading as a test of the hypothesis (see open questions).
 
 ## Requirements, harness and milestones
 
@@ -177,6 +191,9 @@ datapitfalls-bench/
 - [ ] As-of dates: start from BTS's stated lag of about 10 weeks. The TranStats release page shows when months were added and updated; can its history be recovered for the chosen window, or only archived from now on?
 - [x] Does the database hold final figures only? It holds each month as served on the fetch date. Late filing shows in the newest months; corrections to older months look rare (see The world).
 - [x] Which model does the agent under test run on? `claude-opus-5-5` at medium effort for the pilot (see Setups compared).
+- [ ] **Blocking the pilot:** five of the eleven traps do not catch `claude-opus-5-5`, and the rest only test whether a house rule is remembered. Options: accept that and reframe the claim around decision memory; make traps harder (less hand-holding in the schema briefing, vaguer questions, traps that must be discovered because no memo covers them); or test a weaker model, where the traps may bite. They are not exclusive.
+- [ ] `fastest-growing-airport`: with standards given, the agent also applied the like-for-like carrier rule, which the standard's wording allows and the gold query does not do. Change the standard's wording or the gold query.
+- [ ] The firmer note-saving prompt (standards are announced once; save them) has not been tested live. Any further change to memory prompts should be made once, before the pilot, and recorded, so the memory setups are not tuned until they win.
 - [ ] Is announce-once the right default for standards? It makes any memory that keeps the memos beat no memory by construction. The `always` mode is the control; the write-up should report both.
 - [x] Which model does the Debrief review engine use? The same model as the agent, `claude-opus-5-5`, for the pilot. Not yet confirmed: that the datapitfalls engine (v0.12.0) runs cleanly on it; check in the first live trial. Core's own default is still under review (core PRD 1, C13).
 - [ ] If Hex releases Metric City, run the same memory setups on it as a second, synthetic world?

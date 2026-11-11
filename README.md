@@ -15,7 +15,7 @@ The traps are real, not planted: partial months, carriers that stop reporting af
 
 🚧 **Pre-release.** The design is in [docs/PRD.md](docs/PRD.md). The harness is being built in the open; follow along or open an issue with ideas.
 
-Built so far: the [database builder](data/README.md), the [trap scanner and trap catalog](traps/README.md), the as-of replay engine, the [first question set](questions/README.md), the business-context timeline, a Claude adapter, five memory setups, the scorer and the [runner](docs/running.md). Everything is tested offline; the benchmark has not yet been run against a live model, so there are no results.
+Built so far: the [database builder](data/README.md), the [trap scanner and trap catalog](traps/README.md), the as-of replay engine, the [first question set](questions/README.md), the business-context timeline, a Claude adapter, five memory setups, the scorer and the [runner](docs/running.md). Two small live runs have checked that it works and measured its cost ([notes](docs/live-trial-2026-11.md)); there are no benchmark results yet.
 
 ## Part of the datapitfalls family
 

@@ -12,3 +12,4 @@ export * from './runner.js';
 export * from './setup-factory.js';
 export * from './adapters/claude.js';
 export * from './adapters/scripted.js';
+export * from './deliverables.js';
