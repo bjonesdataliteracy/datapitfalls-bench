@@ -13,7 +13,7 @@ import { instantiate, loadQuestionSet } from './questions.js';
 import { materializeAsOf, newestVisibleMonth, openAsOfView } from './replay.js';
 import { estimateSessionCost, readRun, runBenchmark, type CostAssumptions } from './runner.js';
 import { compareSetups, metricsCsv, scoreSession, summarizeBySetup } from './scorer.js';
-import { createSetupFactory, loadTaxonomy } from './setup-factory.js';
+import { benchApiKey, createSetupFactory, loadTaxonomy } from './setup-factory.js';
 import { loadTrapWindows } from './traps.js';
 
 const USAGE = `datapitfalls-bench
@@ -261,7 +261,7 @@ async function run(flags: Map<string, string>, dbPath: string): Promise<number> 
       createSetup,
       createAgent: (key) =>
         live
-          ? createClaudeAdapter({ model, effort })
+          ? createClaudeAdapter({ model, effort, apiKey: benchApiKey() })
           : createScriptedAdapter(agentKind as Script, key),
       log: (line) => console.log(line),
     }

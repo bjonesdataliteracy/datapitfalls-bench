@@ -26,11 +26,12 @@ Other free agents, for checking the scorer: `--agent oracle` (always gold), `--a
 ## Live run (paid)
 
 ```bash
-export ANTHROPIC_API_KEY=...
+export BENCH_ANTHROPIC_API_KEY=...   # or ANTHROPIC_API_KEY
 node dist/cli.js run --db data/bench.db --from 2026-07 --to 2026-07 --out runs/trial \
   --only skywest-load-factor,domestic-passengers --setups none,pitfall --budget 2
 ```
 
+- The key is read from `BENCH_ANTHROPIC_API_KEY` first, then from the SDK's usual variables. The separate name lets a machine hold a key for the benchmark without changing what other Anthropic tools on it use.
 - `--budget` is required. Spend is estimated from each response's token usage and the price table in `src/pricing.ts`; when it reaches the budget, no new session starts and the run ends with exit code 2. Sessions already in flight finish, so the cap can be passed by up to `--concurrency` sessions.
 - `--model` defaults to `claude-opus-5-5` and `--effort` to `medium`. A model with no row in the price table is refused, because it could not be capped.
 - `--review-model` sets the model for Debrief reviews; it defaults to the agent's model, so a run involves one model.
