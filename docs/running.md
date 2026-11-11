@@ -19,7 +19,7 @@ node dist/cli.js run --db data/bench.db --from 2026-02 --to 2026-07 --out runs/d
 
 A dry run does everything a real run does except call a model: a scripted agent that returns the gold answers stands in, and Debrief reviews are skipped. It checks that every piece works on your database, and prints the size of each setup's opening prompt with a rough cost per session for three models.
 
-**That cost is arithmetic on stated assumptions (requests per session, tokens per request), not a measurement.** Replace it with real numbers from a small live trial before budgeting a full run.
+**That cost is arithmetic on stated assumptions (requests per session, tokens per request), not a measurement.** On `claude-opus-5-5` the assumptions turned out about six times too high; see [the first live runs](live-trial-2026-11.md) for measured figures.
 
 Other free agents, for checking the scorer: `--agent oracle` (always gold), `--agent naive` (the trap's answer whenever a question has a trap), `--agent stale` (last month's gold).
 
@@ -35,6 +35,7 @@ node dist/cli.js run --db data/bench.db --from 2026-07 --to 2026-07 --out runs/t
 - `--budget` is required. Spend is estimated from each response's token usage and the price table in `src/pricing.ts`; when it reaches the budget, no new session starts and the run ends with exit code 2. Sessions already in flight finish, so the cap can be passed by up to `--concurrency` sessions.
 - `--model` defaults to `claude-opus-5-5` and `--effort` to `medium`. A model with no row in the price table is refused, because it could not be capped.
 - `--review-model` sets the model for Debrief reviews; it defaults to the agent's model, so a run involves one model.
+- `--context-mode never` gives the agent no standards at all, and `always` gives every one issued so far. Run a no-memory month both ways to see which traps catch a model unaided.
 - `--only`, `--setups` and a short month range keep a trial small. Start with one month and a few questions.
 - Authentication, permission and bad-request errors stop the run. Rate limits and server errors are retried, and a session that still fails is recorded as unanswered.
 - If the model declines a request, the session is recorded as unanswered. The harness does not fall back to another model, because the result would no longer measure the model named in the run.

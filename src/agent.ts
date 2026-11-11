@@ -81,7 +81,7 @@ export function systemPrompt(task: Pick<AgentTask, 'canRemember' | 'memoryInstru
   if (task.memoryInstructions) parts.push(task.memoryInstructions);
   if (task.canRemember) {
     parts.push(
-      'You can call remember to save a note for future sessions. Each note needs at least one rule id from the Avoiding Data Pitfalls taxonomy that it helps avoid.'
+      'Saving notes: nothing from this session carries over unless you save it with the remember tool. Before you call submit_answer, save a note for anything a future session could not work out from the data alone. Reporting standards are announced once and never repeated, so save each one you were given that is not already in memory, in its own words, as a decision. Also save any quirk of the data or near-mistake you ran into. Do not save numbers or answers. Many sessions need no note. Each note needs at least one rule id from the Avoiding Data Pitfalls taxonomy that it helps avoid.'
     );
   }
   return parts.join('\n\n');
