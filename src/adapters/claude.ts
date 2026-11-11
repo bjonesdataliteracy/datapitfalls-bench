@@ -22,6 +22,8 @@ export interface ClaudeAdapterOptions {
   model?: string;
   /** Sent as output_config.effort. Defaults to medium. */
   effort?: Effort;
+  /** API key. Without it the SDK reads its usual environment variables. */
+  apiKey?: string;
   /** A client to use in place of one built from the environment (tests pass a fake). */
   client?: Pick<Anthropic, 'messages'>;
   maxTokens?: number;
@@ -111,7 +113,9 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
   const model = options.model ?? DEFAULT_CLAUDE_MODEL;
   const effort = options.effort ?? 'medium';
   // Rate limits and server errors are retried by the SDK before they reach us.
-  const client = options.client ?? new Anthropic({ maxRetries: 4 });
+  const client =
+    options.client ??
+    new Anthropic({ maxRetries: 4, ...(options.apiKey ? { apiKey: options.apiKey } : {}) });
 
   async function answer(task: AgentTask): Promise<AgentResult> {
     const recorder = new TranscriptRecorder(task.sessionId, 'claude', new Date().toISOString());

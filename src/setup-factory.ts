@@ -28,6 +28,15 @@ export interface Taxonomy {
   review(transcript: Transcript, model: string): Promise<PitfallReport>;
 }
 
+/**
+ * The key for paid calls. BENCH_ANTHROPIC_API_KEY comes first, so a machine
+ * can hold a key for the benchmark without changing what other Anthropic
+ * tools on it use; without it the SDK's usual variables apply.
+ */
+export function benchApiKey(): string | undefined {
+  return process.env.BENCH_ANTHROPIC_API_KEY || undefined;
+}
+
 /** Load the taxonomy and engine from the datapitfalls package (public exports only). */
 export async function loadTaxonomy(): Promise<Taxonomy> {
   const core = await import('datapitfalls');
@@ -36,7 +45,10 @@ export async function loadTaxonomy(): Promise<Taxonomy> {
     taxonomyVersion: core.taxonomyVersion,
     defaultModel: core.DEFAULT_MODEL,
     review: async (transcript, model) =>
-      (await core.detectPitfalls({ kind: 'transcript', transcript }, { model })) as PitfallReport,
+      (await core.detectPitfalls(
+        { kind: 'transcript', transcript },
+        { model, ...(benchApiKey() ? { apiKey: benchApiKey() } : {}) }
+      )) as PitfallReport,
   };
 }
 
