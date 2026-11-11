@@ -1,0 +1,38 @@
+# datapitfalls bench: business-context timeline (PRD 2, B4)
+#
+# What the analyst is told, and when. Each month the agent receives the
+# persona in force and the memos dated that month, nothing else. A memo is
+# announced once: whether its content is still applied in later months depends
+# on the agent's memory. (The runner's "always" context mode repeats every memo
+# already issued, as a control that takes memory out of the picture.)
+#
+# Months are data months. A memo with `standard` announces that standard from
+# questions/questions.yaml, word for word; a memo with `text` is free-standing.
+# A standard with no memo here would never reach the agent, and tests reject it.
+
+personas:
+  - from: "2024-08"
+    name: Network planning
+    text: You work for the network planning team of a U.S. airline group. They care about routes, airports and how full flights are.
+  - from: "2025-08"
+    name: Airport authority
+    text: You now support an airport authority's strategy office. They care about how airports and city markets compare.
+  - from: "2026-02"
+    name: Investor relations
+    text: You now support an investor relations team. They care about carrier-level growth, share and efficiency, and they compare periods closely.
+
+memos:
+  - month: "2024-08"
+    standard: load-factor-definition
+  - month: "2024-08"
+    standard: like-for-like-carriers
+  - month: "2024-08"
+    standard: growth-ranking-floor
+  - month: "2024-08"
+    standard: city-means-market
+  - month: "2024-08"
+    standard: state-from-t100
+  - month: "2024-08"
+    standard: distance-standardized-comparison
+  - month: "2026-01"
+    standard: alaska-includes-hawaiian
