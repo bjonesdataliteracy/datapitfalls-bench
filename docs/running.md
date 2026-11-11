@@ -33,7 +33,7 @@ node dist/cli.js run --db data/bench.db --from 2026-07 --to 2026-07 --out runs/t
 
 - `--budget` is required. Spend is estimated from each response's token usage and the price table in `src/pricing.ts`; when it reaches the budget, no new session starts and the run ends with exit code 2. Sessions already in flight finish, so the cap can be passed by up to `--concurrency` sessions.
 - `--model` defaults to `claude-opus-5-5` and `--effort` to `medium`. A model with no row in the price table is refused, because it could not be capped.
-- `--review-model` sets the model for Debrief reviews; it defaults to the datapitfalls engine's own default.
+- `--review-model` sets the model for Debrief reviews; it defaults to the agent's model, so a run involves one model.
 - `--only`, `--setups` and a short month range keep a trial small. Start with one month and a few questions.
 - Authentication, permission and bad-request errors stop the run. Rate limits and server errors are retried, and a session that still fails is recorded as unanswered.
 - If the model declines a request, the session is recorded as unanswered. The harness does not fall back to another model, because the result would no longer measure the model named in the run.

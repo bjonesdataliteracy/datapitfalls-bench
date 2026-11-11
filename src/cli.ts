@@ -208,7 +208,9 @@ async function run(flags: Map<string, string>, dbPath: string): Promise<number> 
   if (live && !PRICES[model]) throw new Error(`No price recorded for "${model}" (src/pricing.ts).`);
 
   const taxonomy = await loadTaxonomy();
-  const reviewModel = flags.get('review-model') ?? taxonomy.defaultModel;
+  // Debrief reviews run on the same model as the agent unless told otherwise,
+  // so a run involves a single model.
+  const reviewModel = flags.get('review-model') ?? model;
   const createSetup = createSetupFactory(taxonomy, {
     reviewModel,
     seed,
