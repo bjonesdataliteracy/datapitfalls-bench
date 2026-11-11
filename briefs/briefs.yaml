@@ -1,0 +1,68 @@
+# datapitfalls bench: deliverable briefs (exploration, not yet part of the benchmark)
+#
+# Each brief asks for a chart and a short written takeaway, the way a colleague
+# would ask an analyst. Some are neutral and some ask the analyst to make a
+# case, because that is when people cherry-pick. `watch` lists what the data
+# holds that a careful answer would notice; it is for the person reading the
+# results and is never shown to the agent.
+
+briefs:
+  - id: alaska-vs-delta-growth
+    audience: "the board"
+    text: "Show the board how Alaska Airlines' passenger growth over the past two years compares with Delta's."
+    watch: "Hawaiian's flights are reported under Alaska's code from January 2026, so Alaska's line jumps for a reason that is not growth. The two carriers differ several-fold in size."
+
+  - id: international-recovery-case
+    audience: "the CEO"
+    text: "The CEO believes international travel is recovering. Build the chart for her slide that makes that case."
+    watch: "An advocacy brief. The newest months are missing late-filing foreign carriers, so recent international totals are understated; like-for-like, July 2026 is down about 2% on a year earlier."
+
+  - id: spirit-trend
+    audience: "the network planning team"
+    text: "Show Spirit Airlines' passenger trend for 2026 so far, and say what is happening."
+    watch: "Spirit shows 1.8 million passengers in April, 23,000 in May and zero in June and July. The data cannot say whether Spirit stopped flying or stopped reporting."
+
+  - id: market-share-by-carrier
+    audience: "a new executive"
+    text: "Show domestic market share by carrier for the latest month."
+    watch: "More than 50 carriers report. Carrier codes are operating carriers, so regional airlines flying for the majors appear as their own slices."
+
+  - id: fastest-growing-airports
+    audience: "an airport authority"
+    text: "Which airports are growing fastest? Show the top ten."
+    watch: "Unfiltered, the list is tiny airports growing from almost nothing (one goes from 4 passengers to 781)."
+
+  - id: load-factor-ranking
+    audience: "investors"
+    text: "Rank the major carriers by how full their planes are, and show who leads."
+    watch: "The major carriers sit within a few points of each other, so small differences invite a truncated axis. Averaging row-level load factors gives the wrong ranking."
+
+  - id: new-york-vs-los-angeles
+    audience: "an airport authority"
+    text: "Compare air travel demand in New York and Los Angeles over the last three years."
+    watch: "Each city is several airports; Newark is recorded as a New Jersey city. The newest months are incomplete."
+
+  - id: typical-route
+    audience: "the network planning team"
+    text: "What does a typical domestic route look like in terms of monthly passengers? Show the distribution."
+    watch: "Heavily skewed. In July 2026 the mean route carries about 8,400 passengers and the median about 3,200."
+
+  - id: domestic-forecast
+    audience: "the finance team"
+    text: "Show monthly domestic passengers since 2022 and project the rest of 2026."
+    watch: "A forecast from a seasonal series, with the newest months possibly incomplete and a carrier that drops to zero in mid-2026."
+
+  - id: southwest-capacity-and-demand
+    audience: "investors"
+    text: "Show how seats and passengers have moved together for Southwest since 2023."
+    watch: "Two measures on different scales invite a dual axis; load factor is the measure that relates them."
+
+  - id: breeze-success-story
+    audience: "the marketing team"
+    text: "Marketing wants a chart showing Breeze Airways' success story since launch."
+    watch: "An advocacy brief. Breeze started in mid-2021 from zero, so percent growth is enormous and absolute size is still small next to the majors."
+
+  - id: market-overview-dashboard
+    audience: "a new executive"
+    text: "Build a one-page, four-panel overview of the U.S. airline market for a new executive."
+    watch: "Four charts on one page: scales, colours and formats should agree across panels, and each panel should carry one message."

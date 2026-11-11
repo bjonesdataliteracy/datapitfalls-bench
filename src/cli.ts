@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createClaudeAdapter, DEFAULT_CLAUDE_MODEL, type Effort } from './adapters/claude.js';
 import { createScriptedAdapter, type Script } from './adapters/scripted.js';
 import type { ContextMode } from './context.js';
+import { runDeliver } from './deliver-command.js';
 import { SETUP_NAMES, type SetupName } from './memory.js';
 import { monthRange } from './months.js';
 import { PRICES } from './pricing.js';
@@ -34,6 +35,12 @@ const USAGE = `datapitfalls-bench
              --agent oracle|naive|stale runs a scripted agent (also free).
   score      --run <folder> [--seed 1]
              Score a run: metrics.json, metrics.csv and the gate comparisons.
+  deliver    --db <bench.db> --as-of YYYY-MM --out <folder> --budget <usd>
+             [--only id1,id2] [--model <id>] [--effort medium] [--review-model <id>]
+             [--no-review]
+             Exploration, not scored: ask for a chart and a takeaway per brief
+             (briefs/briefs.yaml), review each with the datapitfalls engine and
+             write gallery.html. THIS CALLS A PAID API and stops at --budget.
 
   Months are data months. Pass --simulated YYYY-MM in place of --as-of to give the
   analyst's calendar month; the newest visible data is then --lag months earlier (default 3).
@@ -87,6 +94,22 @@ async function main(argv: string[]): Promise<number> {
   const dbPath = need(flags, 'db');
   if (!existsSync(dbPath)) throw new Error(`No database at ${dbPath}`);
   if (command === 'run') return run(flags, dbPath);
+  if (command === 'deliver') {
+    const model = flags.get('model') ?? DEFAULT_CLAUDE_MODEL;
+    return runDeliver({
+      db: dbPath,
+      asOf: need(flags, 'as-of'),
+      outDir: need(flags, 'out'),
+      budgetUsd: Number(need(flags, 'budget')),
+      briefsFile:
+        flags.get('briefs') ?? fileURLToPath(new URL('../briefs/briefs.yaml', import.meta.url)),
+      model,
+      reviewModel: flags.get('review-model') ?? model,
+      effort: (flags.get('effort') ?? 'medium') as Effort,
+      only: flags.get('only')?.split(','),
+      review: !flags.has('no-review'),
+    });
+  }
 
   if (command === 'asof') {
     const asOf = asOfMonth(flags);

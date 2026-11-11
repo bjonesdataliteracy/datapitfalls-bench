@@ -26,6 +26,8 @@ export interface Taxonomy {
   taxonomyVersion: string;
   defaultModel: string;
   review(transcript: Transcript, model: string): Promise<PitfallReport>;
+  /** Review any engine input (a chart, a chain of stages, text) on the given model. */
+  reviewAny(input: unknown, model: string): Promise<PitfallReport>;
 }
 
 /**
@@ -44,6 +46,11 @@ export async function loadTaxonomy(): Promise<Taxonomy> {
     resolveRuleId: core.resolveRuleId,
     taxonomyVersion: core.taxonomyVersion,
     defaultModel: core.DEFAULT_MODEL,
+    reviewAny: async (input, model) =>
+      (await core.detectPitfalls(input as Parameters<typeof core.detectPitfalls>[0], {
+        model,
+        ...(benchApiKey() ? { apiKey: benchApiKey() } : {}),
+      })) as PitfallReport,
     review: async (transcript, model) =>
       (await core.detectPitfalls(
         { kind: 'transcript', transcript },
